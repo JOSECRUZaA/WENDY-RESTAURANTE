@@ -1,0 +1,218 @@
+import React from 'react';
+import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import {
+    ChefHat,
+    UtensilsCrossed,
+    LogOut,
+    Users,
+    ShoppingBag,
+    CircleDollarSign,
+    ClipboardList,
+    Beer,
+    LayoutGrid
+} from 'lucide-react';
+
+import { supabase } from '../lib/supabase'; // Add Import
+
+export default function MainLayout() {
+    const { profile, signOut } = useAuth();
+    const location = useLocation();
+    const navigate = useNavigate();
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
+    const [cashStatus, setCashStatus] = React.useState<'abierta' | 'cerrada'>('cerrada');
+
+    const handleSignOut = async () => {
+        await signOut();
+        navigate('/login');
+    };
+
+    if (!profile) return (
+        <div className="flex h-screen items-center justify-center bg-gray-50 flex-col gap-4">
+            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center animate-pulse">
+                <Users size={32} className="text-red-500" />
+            </div>
+            <h2 className="text-xl font-bold text-gray-800">Error de Perfil</h2>
+            <p className="text-gray-500 text-center max-w-md px-4">
+                No se pudo cargar tu información de usuario. Esto puede ocurrir si tu cuenta fue eliminada o archivada recientemente.
+            </p>
+            <button
+                onClick={handleSignOut}
+                className="px-6 py-2 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition-colors shadow-lg shadow-red-200"
+            >
+                Cerrar Sesión
+            </button>
+        </div>
+    );
+
+    React.useEffect(() => {
+        setIsMobileMenuOpen(false);
+    }, [location.pathname]);
+
+    // FETCH & SUBSCRIBE TO CASH STATUS
+    React.useEffect(() => {
+        const checkCashStatus = async () => {
+            const { count } = await supabase
+                .from('cash_sessions')
+                .select('*', { count: 'exact', head: true })
+                .eq('estado', 'abierta');
+
+            setCashStatus(count && count > 0 ? 'abierta' : 'cerrada');
+        };
+
+        checkCashStatus();
+
+        const channel = supabase
+            .channel('cash_status_sidebar')
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'cash_sessions' },
+                () => checkCashStatus()
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, []);
+
+    return (
+        <div className="flex h-screen bg-gray-100 flex-col md:flex-row">
+            {/* Mobile Header */}
+            <header className="bg-white border-b p-4 flex justify-between items-center md:hidden z-20">
+                <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-red-600 flex items-center justify-center text-white font-bold">
+                        W
+                    </div>
+                    <span className="font-bold text-gray-800">Wendy's App</span>
+                </div>
+                <button
+                    onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                    className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+                >
+                    {isMobileMenuOpen ? <LogOut size={24} className="rotate-180" /> : <div className="space-y-1.5">
+                        <span className="block w-6 h-0.5 bg-gray-800"></span>
+                        <span className="block w-6 h-0.5 bg-gray-800"></span>
+                        <span className="block w-6 h-0.5 bg-gray-800"></span>
+                    </div>}
+                </button>
+            </header>
+
+            {/* Sidebar (Desktop: Static, Mobile: Fixed Overlay) */}
+            <aside className={`
+                fixed inset-y-0 left-0 z-30 w-64 bg-white shadow-xl transform transition-transform duration-300 ease-in-out
+                md:relative md:translate-x-0 md:bg-white md:shadow-md md:flex md:flex-col
+                ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
+            `}>
+                <div className="p-6 border-b bg-gray-50 flex justify-between items-center">
+                    <div>
+                        <h1 className="text-xl font-black text-gray-800 uppercase tracking-wider">{profile.rol}</h1>
+                        <div className="flex items-center gap-2 mt-1">
+                            <span className="relative flex h-3 w-3">
+                                <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${cashStatus === 'abierta' ? 'bg-green-400' : 'bg-red-400'
+                                    }`}></span>
+                                <span className={`relative inline-flex rounded-full h-3 w-3 ${cashStatus === 'abierta' ? 'bg-green-500' : 'bg-red-500'
+                                    }`}></span>
+                            </span>
+                            <span className={`text-xs font-bold uppercase tracking-tight ${cashStatus === 'abierta' ? 'text-green-600' : 'text-red-600'
+                                }`}>
+                                {cashStatus === 'abierta' ? 'Caja Abierta' : 'Caja Cerrada'}
+                            </span>
+                        </div>
+                    </div>
+                    {/* Close Button Mobile Only */}
+                    <button
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className="md:hidden p-2 text-gray-400 hover:text-gray-600"
+                    >
+                        <LogOut size={20} className="rotate-180" /> {/* Reusing Icon for Close */}
+                    </button>
+                </div>
+
+                <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+                    {/* Garzon & Cajero & Admin */}
+                    {(['garzon', 'cajero', 'administrador'].includes(profile.rol)) && (
+                        <>
+                            <NavLink to="/mesas" icon={<UtensilsCrossed size={20} />} label="Mesas & Pedidos" active={location.pathname === '/mesas'} />
+                            <NavLink to="/mesas/pedidos" icon={<ClipboardList size={20} />} label="Monitor de Salón" active={location.pathname === '/mesas/pedidos'} />
+                        </>
+                    )}
+
+                    {/* Kitchen / Bar Monitors */}
+                    <div className="pt-4 pb-2 text-xs font-semibold text-gray-400 uppercase">Producción</div>
+                    <NavLink to="/cocina" icon={<ChefHat size={20} />} label="Monitor Cocina" active={location.pathname === '/cocina'} />
+                    <NavLink to="/bar" icon={<Beer size={20} />} label="Monitor Bar" active={location.pathname === '/bar'} />
+
+                    {/* Cajero & Admin */}
+                    {['cajero', 'administrador'].includes(profile.rol) && (
+                        <>
+                            <div className="pt-4 pb-2 text-xs font-semibold text-gray-400 uppercase">Caja</div>
+                            <NavLink to="/caja" icon={<CircleDollarSign size={20} />} label="Gestión de Caja" active={location.pathname === '/caja'} />
+                            <NavLink to="/ventas-diarias" icon={<ClipboardList size={20} />} label="Ventas del Día" active={location.pathname === '/ventas-diarias'} />
+                            <div className="pt-4 pb-2 text-xs font-semibold text-gray-400 uppercase">Sistema</div>
+                            <NavLink to="/admin/online" icon={<Users size={20} />} label="Usuarios Online" active={location.pathname === '/admin/online'} />
+                        </>
+                    )}
+
+                    {/* Admin Only */}
+                    {profile.rol === 'administrador' && (
+                        <>
+                            <div className="pt-4 pb-2 text-xs font-semibold text-gray-400 uppercase">Administración</div>
+                            <NavLink to="/admin/productos" icon={<ShoppingBag size={20} />} label="Productos" active={location.pathname === '/admin/productos'} />
+                            <NavLink to="/admin/mesas" icon={<LayoutGrid size={20} />} label="Mesas" active={location.pathname === '/admin/mesas'} />
+                            <NavLink to="/admin/usuarios" icon={<Users size={20} />} label="Usuarios" active={location.pathname === '/admin/usuarios'} />
+                            <NavLink to="/admin/reportes" icon={<ClipboardList size={20} />} label="Reportes" active={location.pathname === '/admin/reportes'} />
+                        </>
+                    )}
+                </nav>
+
+                <div className="p-4 border-t bg-gray-50">
+                    <div className="flex items-center gap-3 mb-3">
+                        <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center text-red-600 font-bold">
+                            {profile.nombre_completo.charAt(0)}
+                        </div>
+                        <div className="overflow-hidden">
+                            <p className="text-sm font-medium truncate">{profile.nombre_completo}</p>
+                            <p className="text-xs text-gray-500 capitalize">{profile.rol}</p>
+                        </div>
+                    </div>
+                    <button
+                        onClick={handleSignOut}
+                        className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                    >
+                        <LogOut size={16} />
+                        Cerrar Sesión
+                    </button>
+                </div>
+            </aside>
+
+            {/* Overlay Background for Mobile */}
+            {isMobileMenuOpen && (
+                <div
+                    className="fixed inset-0 bg-black/50 z-20 md:hidden"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                />
+            )}
+
+            {/* Main Content */}
+            <main className="flex-1 overflow-auto p-4 md:p-8 relative w-full">
+                <Outlet />
+            </main>
+        </div>
+    );
+}
+
+function NavLink({ to, icon, label, active }: { to: string; icon: React.ReactNode; label: string; active: boolean }) {
+    return (
+        <Link
+            to={to}
+            className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${active
+                ? 'bg-red-50 text-red-600 font-medium'
+                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                }`}
+        >
+            {icon}
+            <span>{label}</span>
+        </Link>
+    );
+}
