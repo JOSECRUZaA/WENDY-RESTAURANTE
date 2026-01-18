@@ -65,7 +65,7 @@ export default function OrderPayment() {
                     filter: `order_id=eq.${order.id}`
                 },
                 () => {
-                    console.log('Cambio detectado en items, recargando...');
+
                     fetchItemsOnly(order.id);
                 }
             )

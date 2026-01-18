@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 import { ChefHat } from 'lucide-react';
 
 export default function Login() {
@@ -9,6 +10,14 @@ export default function Login() {
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+
+    const { user, profile } = useAuth(); // Get auth state
+
+    useEffect(() => {
+        if (user && profile) {
+            navigate('/');
+        }
+    }, [user, profile, navigate]);
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();

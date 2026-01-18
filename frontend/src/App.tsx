@@ -28,7 +28,9 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 function RoleBasedRedirect() {
-  const { profile } = useAuth();
+  const { profile, loading } = useAuth();
+
+  if (loading) return <div className="min-h-screen flex items-center justify-center bg-gray-100">Cargando...</div>;
 
   if (!profile) return <Navigate to="/login" />;
 

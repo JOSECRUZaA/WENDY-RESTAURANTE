@@ -62,8 +62,8 @@ export default function TableMap() {
             .on(
                 'postgres_changes',
                 { event: '*', schema: 'public', table: 'mesas' },
-                (payload) => {
-                    console.log('Realtime update:', payload);
+                (_payload) => {
+
                     fetchTables(); // Refresh on any change
                 }
             )

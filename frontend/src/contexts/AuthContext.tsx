@@ -22,30 +22,54 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        // 1. Get initial session
-        supabase.auth.getSession().then(({ data: { session } }) => {
-            setSession(session);
-            setUser(session?.user ?? null);
-            if (session?.user) {
-                fetchProfile(session.user.id);
-            } else {
-                setLoading(false);
+        let mounted = true;
+
+        async function initializeAuth() {
+            try {
+                // 1. Get initial session
+                const { data: { session } } = await supabase.auth.getSession();
+                
+                if (mounted) {
+                    setSession(session);
+                    setUser(session?.user ?? null);
+                    
+                    if (session?.user) {
+                        await fetchProfile(session.user.id);
+                    } else {
+                        setLoading(false);
+                    }
+                }
+            } catch (error) {
+                console.error('Error getting session:', error);
+                if (mounted) setLoading(false);
             }
-        });
+        }
+
+        initializeAuth();
 
         // 2. Listen for changes
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+            if (!mounted) return;
+
+            if (event === 'SIGNED_IN') {
+                setLoading(true);
+            }
+
             setSession(session);
             setUser(session?.user ?? null);
+
             if (session?.user) {
-                fetchProfile(session.user.id);
+                await fetchProfile(session.user.id);
             } else {
                 setProfile(null);
                 setLoading(false);
             }
         });
 
-        return () => subscription.unsubscribe();
+        return () => {
+            mounted = false;
+            subscription.unsubscribe();
+        };
     }, []);
 
     async function fetchProfile(userId: string) {
