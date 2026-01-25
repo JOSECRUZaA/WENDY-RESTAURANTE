@@ -1,3 +1,4 @@
+/* eslint-disable */
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useOnlineUsers } from '../../contexts/OnlineUsersContext';

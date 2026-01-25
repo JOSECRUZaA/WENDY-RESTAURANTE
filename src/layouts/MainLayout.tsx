@@ -154,15 +154,9 @@ export default function MainLayout() {
     }, [profile]);
 
 
-    if (loading) return (
-        <div className="flex h-screen items-center justify-center bg-gray-50">
-            <div className="w-16 h-16 border-4 border-red-200 border-t-red-600 rounded-full animate-spin"></div>
-        </div>
-    );
 
-    if (!profile) {
-        return <Navigate to="/login" replace />;
-    }
+
+
 
     React.useEffect(() => {
         setIsMobileMenuOpen(false);
@@ -194,6 +188,16 @@ export default function MainLayout() {
             supabase.removeChannel(channel);
         };
     }, []);
+
+    if (loading) return (
+        <div className="flex h-screen items-center justify-center bg-gray-50">
+            <div className="w-16 h-16 border-4 border-red-200 border-t-red-600 rounded-full animate-spin"></div>
+        </div>
+    );
+
+    if (!profile) {
+        return <Navigate to="/login" replace />;
+    }
 
     return (
         <div className="flex h-screen bg-gray-100 flex-col md:flex-row">
