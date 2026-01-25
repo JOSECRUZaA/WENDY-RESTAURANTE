@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import type { Database } from '../../types/database.types';
-import { Bell, Search, CheckCircle, Clock, Utensils, Beer } from 'lucide-react';
+import { Search, CheckCircle, Clock, Utensils, Beer, Wifi, Activity, Bell } from 'lucide-react';
 import { OrderProcessSteps } from '../../components/orders/OrderProcessSteps';
 import { useToast, Toast } from '../../components/ui/Toast';
 
@@ -16,6 +16,11 @@ export default function WaiterOrderMonitor() {
     const [filter, setFilter] = useState('');
     const { toast, showToast } = useToast();
 
+    const [connectionStatus, setConnectionStatus] = useState<string>('Connecting...');
+    const [lastEvent, setLastEvent] = useState<string>('Esperando eventos...');
+
+    // NOTE: Audio and Global Notification logic moved to MainLayout.tsx
+
     useEffect(() => {
         fetchItems();
 
@@ -24,9 +29,17 @@ export default function WaiterOrderMonitor() {
             .on(
                 'postgres_changes',
                 { event: '*', schema: 'public', table: 'order_items' },
-                () => fetchItems()
+                (payload) => {
+                    fetchItems();
+                    setLastEvent(`RX: ${payload.eventType} - ${new Date().toLocaleTimeString()}`);
+                }
             )
-            .subscribe();
+            .subscribe((status) => {
+                setConnectionStatus(status);
+                if (status === 'SUBSCRIBED') {
+                    // Silent connect
+                }
+            });
 
         return () => {
             supabase.removeChannel(channel);
@@ -79,8 +92,17 @@ export default function WaiterOrderMonitor() {
                     <h1 className="text-2xl font-black italic tracking-tighter">MONITOR DE SALÓN</h1>
                     <p className="text-indigo-200 text-sm">Sigue el estado de tus pedidos en tiempo real</p>
                 </div>
-                <div className="bg-white/10 p-3 rounded-full backdrop-blur-sm">
-                    <Bell className="animate-bounce" />
+            </div>
+
+            {/* DEBUG STATUS PANEL */}
+            <div className="grid grid-cols-2 gap-4 text-xs font-mono">
+                <div className={`p-2 rounded border flex items-center gap-2 ${connectionStatus === 'SUBSCRIBED' ? 'bg-green-100 text-green-800 border-green-300' : 'bg-red-100 text-red-800 border-red-300'}`}>
+                    <Wifi size={14} />
+                    <span>Estado: {connectionStatus}</span>
+                </div>
+                <div className="p-2 rounded border bg-gray-100 text-gray-800 border-gray-300 flex items-center gap-2 overflow-hidden whitespace-nowrap">
+                    <Activity size={14} />
+                    <span>{lastEvent}</span>
                 </div>
             </div>
 

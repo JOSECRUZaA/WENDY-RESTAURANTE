@@ -55,6 +55,8 @@ export interface Database {
                     foto_url: string | null
                     controla_stock: boolean
                     stock_actual: number
+                    stock_diario_base: number | null
+                    prioridad: boolean | null
                     disponible: boolean
                     created_at: string
                 }
@@ -67,6 +69,8 @@ export interface Database {
                     foto_url?: string | null
                     controla_stock?: boolean
                     stock_actual?: number
+                    stock_diario_base?: number | null
+                    prioridad?: boolean | null
                     disponible?: boolean
                     created_at?: string
                 }
@@ -79,6 +83,8 @@ export interface Database {
                     foto_url?: string | null
                     controla_stock?: boolean
                     stock_actual?: number
+                    stock_diario_base?: number | null
+                    prioridad?: boolean | null
                     disponible?: boolean
                     created_at?: string
                 }

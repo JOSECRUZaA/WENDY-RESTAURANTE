@@ -43,7 +43,15 @@ export default function ProductionView({ area }: { area?: 'cocina' | 'bar' }) {
             .on(
                 'postgres_changes',
                 { event: '*', schema: 'public', table: 'order_items' },
-                () => fetchPendingItems()
+                (payload) => {
+                    fetchPendingItems();
+                    if (payload.eventType === 'INSERT') {
+                        // Vibrate for mobile devices (200ms pulse, 100ms pause, 200ms pulse)
+                        if (typeof navigator !== 'undefined' && navigator.vibrate) {
+                            navigator.vibrate([200, 100, 200]);
+                        }
+                    }
+                }
             )
             .subscribe();
 

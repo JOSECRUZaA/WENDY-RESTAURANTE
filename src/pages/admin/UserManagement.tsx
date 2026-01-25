@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { createClient } from '@supabase/supabase-js';
 import { supabase } from '../../lib/supabase';
 import type { Database } from '../../types/database.types';
 import { Trash2, Search, UserPlus, X, Pencil, CheckCircle, KeyRound } from 'lucide-react';
@@ -7,6 +8,14 @@ import { Toast, useToast } from '../../components/ui/Toast';
 import { ConfirmationModal } from '../../components/ui/ConfirmationModal';
 
 type Profile = Database['public']['Tables']['profiles']['Row'];
+
+interface UserFormData {
+    email: string;
+    password?: string;
+    nombre: string;
+    carnet: string;
+    rol: Database['public']['Tables']['profiles']['Row']['rol'];
+}
 
 export default function UserManagement() {
     const [users, setUsers] = useState<Profile[]>([]);
@@ -90,7 +99,7 @@ export default function UserManagement() {
         setIsModalOpen(true);
     };
 
-    const handleSaveUser = async (userData: any) => {
+    const handleSaveUser = async (userData: UserFormData) => {
         if (editingUser) {
             // UPDATE EXISTING USER
             const { error } = await supabase
@@ -113,7 +122,6 @@ export default function UserManagement() {
         } else {
             // CREATE NEW USER
             // Create a temporary client to avoid logging out the admin
-            const { createClient } = await import('@supabase/supabase-js');
             const tempSupabase = createClient(
                 import.meta.env.VITE_SUPABASE_URL,
                 import.meta.env.VITE_SUPABASE_ANON_KEY,
@@ -132,7 +140,7 @@ export default function UserManagement() {
                 ? userInput.toLowerCase()
                 : `${userInput.replace(/[^a-zA-Z0-9._-]/g, '').toUpperCase()}@wendys.system`;
 
-            const cleanPassword = userData.password.trim();
+            const cleanPassword = (userData.password || '').trim();
 
             const { data: signUpData, error } = await tempSupabase.auth.signUp({
                 email: cleanEmail,
@@ -317,8 +325,13 @@ export default function UserManagement() {
 }
 
 // UserModal Component (kept below as is)
-function UserModal({ isOpen, onClose, onSubmit, userToEdit }: { isOpen: boolean; onClose: () => void; onSubmit: (data: any) => void; userToEdit: Profile | null }) {
-    const [formData, setFormData] = useState({
+function UserModal({ isOpen, onClose, onSubmit, userToEdit }: {
+    isOpen: boolean;
+    onClose: () => void;
+    onSubmit: (data: UserFormData) => void;
+    userToEdit: Profile | null
+}) {
+    const [formData, setFormData] = useState<UserFormData>({
         email: '',
         password: '',
         nombre: '',
@@ -395,7 +408,7 @@ function UserModal({ isOpen, onClose, onSubmit, userToEdit }: { isOpen: boolean;
                         <select
                             className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-red-500 outline-none bg-white"
                             value={formData.rol}
-                            onChange={e => setFormData({ ...formData, rol: e.target.value })}
+                            onChange={e => setFormData({ ...formData, rol: e.target.value as UserFormData['rol'] })}
                         >
                             <option value="garzon">Garzón (Mesero)</option>
                             <option value="cajero">Cajero</option>

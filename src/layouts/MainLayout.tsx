@@ -1,6 +1,7 @@
 import React from 'react';
-import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
+import { Outlet, Link, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast, Toast } from '../components/ui/Toast';
 import {
     ChefHat,
     UtensilsCrossed,
@@ -13,37 +14,121 @@ import {
     LayoutGrid
 } from 'lucide-react';
 
-import { supabase } from '../lib/supabase'; // Add Import
+import { supabase } from '../lib/supabase';
 
 export default function MainLayout() {
-    const { profile, signOut } = useAuth();
+    const { profile, signOut, loading } = useAuth();
     const location = useLocation();
     const navigate = useNavigate();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
     const [cashStatus, setCashStatus] = React.useState<'abierta' | 'cerrada'>('cerrada');
+
+    // Global Notification State
+    const { toast, showToast, hideToast } = useToast();
+    const audioCtxRef = React.useRef<AudioContext | null>(null);
 
     const handleSignOut = async () => {
         await signOut();
         navigate('/login');
     };
 
-    if (!profile) return (
-        <div className="flex h-screen items-center justify-center bg-gray-50 flex-col gap-4">
-            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center animate-pulse">
-                <Users size={32} className="text-red-500" />
-            </div>
-            <h2 className="text-xl font-bold text-gray-800">Error de Perfil</h2>
-            <p className="text-gray-500 text-center max-w-md px-4">
-                No se pudo cargar tu información de usuario. Esto puede ocurrir si tu cuenta fue eliminada o archivada recientemente.
-            </p>
-            <button
-                onClick={handleSignOut}
-                className="px-6 py-2 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition-colors shadow-lg shadow-red-200"
-            >
-                Cerrar Sesión
-            </button>
+    // --- AUDIO LOGIC ---
+    const initAudio = () => {
+        if (!audioCtxRef.current) {
+            const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+            if (AudioContext) {
+                audioCtxRef.current = new AudioContext();
+            }
+        }
+        if (audioCtxRef.current?.state === 'suspended') {
+            audioCtxRef.current.resume();
+        }
+    };
+
+    const playNotification = () => {
+        try {
+            if (!audioCtxRef.current) initAudio();
+            const ctx = audioCtxRef.current;
+            if (!ctx) return;
+
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(600, ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(800, ctx.currentTime + 0.1);
+            osc.frequency.exponentialRampToValueAtTime(400, ctx.currentTime + 0.5);
+
+            gain.gain.setValueAtTime(0.5, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 1.5);
+
+            osc.start();
+            osc.stop(ctx.currentTime + 1.5);
+
+            if (navigator.vibrate) navigator.vibrate([200, 100, 400]);
+        } catch (error) {
+            console.error('Audio Error:', error);
+        }
+    };
+
+    // Initialize Audio on Interaction
+    React.useEffect(() => {
+        const enableAudio = () => initAudio();
+        document.addEventListener('click', enableAudio);
+        document.addEventListener('touchstart', enableAudio);
+        return () => {
+            document.removeEventListener('click', enableAudio);
+            document.removeEventListener('touchstart', enableAudio);
+        };
+    }, []);
+
+    // --- GLOBAL SUBSCRIPTION (Ready Orders) ---
+    React.useEffect(() => {
+        if (!profile || !['garzon', 'administrador', 'cajero'].includes(profile.rol)) return;
+
+        const channel = supabase
+            .channel('global_waiter_notifications')
+            .on(
+                'postgres_changes',
+                { event: 'UPDATE', schema: 'public', table: 'order_items' },
+                async (payload) => {
+                    const newRecord = payload.new as any;
+                    // Trigger only when status changes to 'listo_para_servir'
+                    if (newRecord.estado === 'listo_para_servir') {
+                        // Fetch Table Number for better context
+                        const { data: orderData } = await supabase
+                            .from('orders')
+                            .select('numero_mesa')
+                            .eq('id', newRecord.order_id)
+                            .single();
+
+                        const mesa = orderData?.numero_mesa || '?';
+
+                        playNotification();
+                        showToast(`¡Pedido Listo! Mesa ${mesa}`, 'success');
+                    }
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [profile]);
+
+
+    if (loading) return (
+        <div className="flex h-screen items-center justify-center bg-gray-50">
+            <div className="w-16 h-16 border-4 border-red-200 border-t-red-600 rounded-full animate-spin"></div>
         </div>
     );
+
+    if (!profile) {
+        return <Navigate to="/login" replace />;
+    }
 
     React.useEffect(() => {
         setIsMobileMenuOpen(false);
@@ -78,6 +163,9 @@ export default function MainLayout() {
 
     return (
         <div className="flex h-screen bg-gray-100 flex-col md:flex-row">
+            {/* Global Toast */}
+            <Toast message={toast.message} type={toast.type} isVisible={toast.isVisible} onClose={hideToast} />
+
             {/* Mobile Header */}
             <header className="bg-white border-b p-4 flex justify-between items-center md:hidden z-20">
                 <div className="flex items-center gap-2">
@@ -100,8 +188,8 @@ export default function MainLayout() {
 
             {/* Sidebar (Desktop: Static, Mobile: Fixed Overlay) */}
             <aside className={`
-                fixed inset-y-0 left-0 z-30 w-64 bg-white shadow-xl transform transition-transform duration-300 ease-in-out
-                md:relative md:translate-x-0 md:bg-white md:shadow-md md:flex md:flex-col
+                fixed inset-y-0 left-0 z-30 w-64 bg-white shadow-xl transform transition-transform duration-300 ease-in-out flex flex-col
+                md:relative md:translate-x-0 md:bg-white md:shadow-md
                 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
             `}>
                 <div className="p-6 border-b bg-gray-50 flex justify-between items-center">

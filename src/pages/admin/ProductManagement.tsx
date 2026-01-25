@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import type { Database } from '../../types/database.types';
-import { Plus, Edit2, Trash2, Search, X } from 'lucide-react';
+import { Plus, Edit2, Trash2, Search, X, RefreshCw, Star } from 'lucide-react';
 
 type Product = Database['public']['Tables']['products']['Row'];
 type ProductionArea = Product['area'];
@@ -21,6 +21,8 @@ function ProductModal({ isOpen, onClose, product, onSave }: ActionModalProps) {
         area: 'cocina',
         controla_stock: false,
         stock_actual: 0,
+        stock_diario_base: 0,
+        prioridad: false,
         disponible: true,
         foto_url: ''
     });
@@ -37,6 +39,8 @@ function ProductModal({ isOpen, onClose, product, onSave }: ActionModalProps) {
                 area: 'cocina',
                 controla_stock: false,
                 stock_actual: 0,
+                stock_diario_base: 0,
+                prioridad: false,
                 disponible: true,
                 foto_url: ''
             });
@@ -50,20 +54,32 @@ function ProductModal({ isOpen, onClose, product, onSave }: ActionModalProps) {
         setLoading(true);
 
         try {
+            // Sanitize payload: remove system fields that shouldn't be updated manually
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            const { id, created_at, ...updateData } = formData as any;
+
+            let error;
+
             if (product?.id) {
-                await supabase
+                const { error: updateError } = await supabase
                     .from('products')
-                    .update(formData)
+                    .update(updateData)
                     .eq('id', product.id);
+                error = updateError;
             } else {
-                await supabase
+                const { error: insertError } = await supabase
                     .from('products')
-                    .insert(formData as any);
+                    .insert(updateData);
+                error = insertError;
             }
+
+            if (error) throw error;
+
             onSave();
             onClose();
-        } catch (error) {
-            alert('Error al guardar');
+        } catch (error: any) {
+            console.error('Error saving:', error);
+            alert('Error al guardar: ' + (error.message || 'Error desconocido'));
         } finally {
             setLoading(false);
         }
@@ -140,16 +156,49 @@ function ProductModal({ isOpen, onClose, product, onSave }: ActionModalProps) {
                     </div>
 
                     {formData.controla_stock && (
-                        <div>
-                            <label className="block text-sm font-medium mb-1">Stock Actual</label>
-                            <input
-                                type="number"
-                                className="w-full border rounded-lg p-2"
-                                value={formData.stock_actual}
-                                onChange={e => setFormData({ ...formData, stock_actual: parseInt(e.target.value) })}
-                            />
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium mb-1">Stock Actual</label>
+                                <input
+                                    type="number"
+                                    className="w-full border rounded-lg p-2"
+                                    value={formData.stock_actual}
+                                    onChange={e => setFormData({ ...formData, stock_actual: parseInt(e.target.value) })}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium mb-1 flex items-center gap-1">
+                                    <RefreshCw size={14} /> Stock Base Diario
+                                </label>
+                                <input
+                                    type="number"
+                                    className="w-full border rounded-lg p-2"
+                                    placeholder="Ej. 50"
+                                    value={formData.stock_diario_base || 0}
+                                    onChange={e => setFormData({ ...formData, stock_diario_base: parseInt(e.target.value) })}
+                                />
+                                <p className="text-[10px] text-gray-400 mt-1">Se reiniciará a este valor al "Iniciar Día"</p>
+                            </div>
                         </div>
                     )}
+
+                    <div className="mt-4 p-4 bg-yellow-50 rounded-xl border border-yellow-100">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={formData.prioridad || false}
+                                onChange={e => setFormData({ ...formData, prioridad: e.target.checked })}
+                                className="w-4 h-4 text-yellow-600 rounded"
+                            />
+                            <div className="flex items-center gap-2">
+                                <Star size={18} className="text-yellow-500 fill-yellow-500" />
+                                <div>
+                                    <span className="text-sm font-bold text-gray-800">Producto Prioritario</span>
+                                    <p className="text-xs text-gray-500">Aparecerá destacado en la toma de pedidos para impulsar su venta.</p>
+                                </div>
+                            </div>
+                        </label>
+                    </div>
 
                     <div className="flex justify-end gap-3 mt-6">
                         <button
@@ -173,25 +222,108 @@ function ProductModal({ isOpen, onClose, product, onSave }: ActionModalProps) {
     );
 }
 
+// Internal Component for Delete Confirmation
+function DeleteConfirmationModal({ isOpen, onClose, onConfirm, loading }: { isOpen: boolean; onClose: () => void; onConfirm: () => void; loading: boolean }) {
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 backdrop-blur-sm animate-in fade-in">
+            <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl scale-100 transform transition-all">
+                <div className="flex flex-col items-center text-center space-y-4">
+                    <div className="bg-red-100 p-4 rounded-full text-red-600">
+                        <Trash2 size={48} />
+                    </div>
+
+                    <div>
+                        <h3 className="text-xl font-bold text-gray-900">¿Eliminar Producto?</h3>
+                        <p className="text-gray-500 mt-2 text-sm">
+                            El producto desaparecerá del menú y de la lista de gestión, pero
+                            <span className="font-bold text-gray-700"> se mantendrá en el historial de ventas</span> para no afectar tus reportes.
+                        </p>
+                    </div>
+
+                    <div className="flex gap-3 w-full mt-4">
+                        <button
+                            onClick={onClose}
+                            className="flex-1 px-4 py-3 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl font-medium transition-colors"
+                        >
+                            Cancelar
+                        </button>
+                        <button
+                            onClick={onConfirm}
+                            disabled={loading}
+                            className="flex-1 px-4 py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-colors shadow-lg shadow-red-200 disabled:opacity-50 flex items-center justify-center gap-2"
+                        >
+                            {loading ? 'Eliminando...' : 'Sí, Eliminar'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 export default function ProductManagement() {
     const [products, setProducts] = useState<Product[]>([]);
     const [search, setSearch] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
+    // Delete Modal State
+    const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+    const [productToDelete, setProductToDelete] = useState<number | null>(null);
+    const [deleteLoading, setDeleteLoading] = useState(false);
+
     useEffect(() => {
         fetchProducts();
     }, []);
 
     async function fetchProducts() {
-        const { data } = await supabase.from('products').select('*').order('nombre');
+        const { data } = await supabase
+            .from('products')
+            .select('*')
+            .eq('disponible', true) // Only show active products
+            .order('nombre');
         setProducts(data || []);
     }
 
-    const handleDelete = async (id: number) => {
-        if (!confirm('¿Estás seguro de eliminar este producto?')) return;
-        await supabase.from('products').delete().eq('id', id);
-        fetchProducts();
+    const confirmDelete = async () => {
+        if (productToDelete === null) return;
+        setDeleteLoading(true);
+
+        try {
+            await supabase
+                .from('products')
+                .update({ disponible: false })
+                .eq('id', productToDelete);
+
+            fetchProducts();
+            setDeleteModalOpen(false);
+            setProductToDelete(null);
+        } catch (error) {
+            alert('Error al eliminar');
+        } finally {
+            setDeleteLoading(false);
+        }
+    };
+
+    const startDayInventory = async () => {
+        if (!confirm('¿Estás seguro de reiniciar el stock de los productos controlados?\n\nEl stock actual se reemplazará por el "Stock Base Diario" configurado.')) return;
+
+        try {
+            const { error } = await supabase.rpc('reset_daily_stock');
+            if (error) throw error;
+            alert('Inventario reiniciado correctamente');
+            fetchProducts();
+        } catch (error: any) {
+            console.error('Error reset:', error);
+            alert('Error: ' + error.message + '\n\n(Asegúrate de haber ejecutado el script SQL de actualización)');
+        }
+    };
+
+    const handleDeleteClick = (id: number) => {
+        setProductToDelete(id);
+        setDeleteModalOpen(true);
     };
 
     const filteredProducts = products.filter(p =>
@@ -200,14 +332,22 @@ export default function ProductManagement() {
 
     return (
         <div className="space-y-6">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <h1 className="text-3xl font-bold text-gray-900">Gestión de Productos</h1>
-                <button
-                    onClick={() => { setEditingProduct(null); setIsModalOpen(true); }}
-                    className="bg-red-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-red-700"
-                >
-                    <Plus size={20} /> Nuevo Producto
-                </button>
+                <div className="flex gap-2">
+                    <button
+                        onClick={startDayInventory}
+                        className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-gray-50 font-medium"
+                    >
+                        <RefreshCw size={20} /> Iniciar Día
+                    </button>
+                    <button
+                        onClick={() => { setEditingProduct(null); setIsModalOpen(true); }}
+                        className="bg-red-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-red-700 font-bold shadow-md shadow-red-200"
+                    >
+                        <Plus size={20} /> Nuevo Producto
+                    </button>
+                </div>
             </div>
 
             <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
@@ -249,11 +389,22 @@ export default function ProductManagement() {
                                     <td className="px-6 py-4 capitalize">{product.area}</td>
                                     <td className="px-6 py-4">
                                         {product.controla_stock ? (
-                                            <span className={`px-2 py-1 rounded text-xs ${product.stock_actual > 5 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                                {product.stock_actual} unids.
-                                            </span>
+                                            <div className="flex flex-col">
+                                                <span className={`px-2 py-1 rounded-md text-xs font-bold w-fit ${product.stock_actual > 5 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                                    {product.stock_actual} actual
+                                                </span>
+                                                {product.stock_diario_base ? (
+                                                    <span className="text-[10px] text-gray-400 mt-0.5">Base: {product.stock_diario_base}</span>
+                                                ) : null}
+                                            </div>
                                         ) : (
                                             <span className="text-gray-400 text-sm">N/A</span>
+                                        )}
+                                        {product.prioridad && (
+                                            <div className="mt-1 flex items-center gap-1 text-[10px] font-bold text-yellow-600 bg-yellow-50 px-1.5 py-0.5 rounded border border-yellow-200 w-fit">
+                                                <Star size={10} className="fill-yellow-500" />
+                                                PUSH
+                                            </div>
                                         )}
                                     </td>
                                     <td className="px-6 py-4 text-right flex justify-end gap-2">
@@ -264,7 +415,7 @@ export default function ProductManagement() {
                                             <Edit2 size={18} />
                                         </button>
                                         <button
-                                            onClick={() => handleDelete(product.id)}
+                                            onClick={() => handleDeleteClick(product.id)}
                                             className="p-2 text-red-600 hover:bg-red-50 rounded"
                                         >
                                             <Trash2 size={18} />
@@ -282,6 +433,13 @@ export default function ProductManagement() {
                 onClose={() => setIsModalOpen(false)}
                 product={editingProduct}
                 onSave={fetchProducts}
+            />
+
+            <DeleteConfirmationModal
+                isOpen={deleteModalOpen}
+                onClose={() => setDeleteModalOpen(false)}
+                onConfirm={confirmDelete}
+                loading={deleteLoading}
             />
         </div>
     );

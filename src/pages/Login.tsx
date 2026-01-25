@@ -11,7 +11,7 @@ export default function Login() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const { user, profile } = useAuth(); // Get auth state
+    const { user, profile, loading: authLoading } = useAuth(); // Get auth state
 
     useEffect(() => {
         if (user && profile) {
@@ -19,42 +19,75 @@ export default function Login() {
         }
     }, [user, profile, navigate]);
 
+    if (authLoading) {
+        return (
+            <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
+                <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md flex flex-col items-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mb-4"></div>
+                    <p className="text-gray-500 font-medium">Verificando sesión...</p>
+                </div>
+            </div>
+        );
+    }
+
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
         setError(null);
 
-        // AUTO-APPEND DOMAIN for simple usernames
-        const email = username.includes('@')
-            ? username
-            : `${username.toUpperCase().trim()}@wendys.system`;
+        try {
+            // AUTO-APPEND DOMAIN for simple usernames
+            const emailInput = username.trim();
+            const email = emailInput.includes('@')
+                ? emailInput
+                : `${emailInput.toUpperCase()}@wendys.system`;
 
-        const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-            email,
-            password,
-        });
+            // CREATE A TIMEOUT PROMISE
+            const timeoutPromise = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error('Tiempo de espera agotado. Revisa tu conexión.')), 10000);
+            });
 
-        if (authError) {
-            setError(authError.message);
-            setLoading(false);
-            return;
-        }
+            // LOGIN REQUEST
+            const loginPromise = supabase.auth.signInWithPassword({
+                email,
+                password,
+            });
 
-        if (authData.user) {
-            // CHECK ACTIVE STATUS
-            const { data: profile } = await supabase
-                .from('profiles')
-                .select('activo')
-                .eq('id', authData.user.id)
-                .single();
+            const result = await Promise.race([loginPromise, timeoutPromise]);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const { data: authData, error: authError } = result as any;
 
-            if (profile && profile.activo === false) {
-                await supabase.auth.signOut();
-                setError('Este usuario ha sido desactivado. Contacte al administrador.');
-                setLoading(false);
-            } else {
+            if (authError) {
+                throw authError; // Throw to catch block
+            }
+
+            if (authData.user) {
+                // CHECK ACTIVE STATUS
+                const { data: profile, error: profileError } = await supabase
+                    .from('profiles')
+                    .select('activo')
+                    .eq('id', authData.user.id)
+                    .single();
+
+                if (profileError) {
+                    // If profile doesn't exist, we still allow login to let AuthContext handle the "Profile Error" screen
+                    // taking user to the "Error de Perfil" page is better than blocking here.
+                    console.warn('Profile check failed, proceeding anyway:', profileError);
+                }
+
+                if (profile && profile.activo === false) {
+                    await supabase.auth.signOut();
+                    throw new Error('Este usuario ha sido desactivado. Contacte al administrador.');
+                }
+
+                // Success - Navigation handled by useEffect or navigate
                 navigate('/');
             }
+        } catch (err) {
+            console.error('Login error:', err);
+            const errorMessage = err instanceof Error ? err.message : 'Error desconocido al iniciar sesión';
+            setError(errorMessage);
+            setLoading(false);
         }
     };
 

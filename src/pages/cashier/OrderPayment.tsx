@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import type { Database } from '../../types/database.types';
-import { ArrowLeft, CreditCard, Banknote, QrCode, Receipt, AlertTriangle, Lock, ChefHat, Beer, CheckCircle } from 'lucide-react';
+import { ArrowLeft, CreditCard, Banknote, QrCode, Receipt, Lock, ChefHat, Beer, CheckCircle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
 type Order = Database['public']['Tables']['orders']['Row'];
@@ -169,7 +169,7 @@ export default function OrderPayment() {
         .reduce((sum, item) => sum + (item.cantidad * item.precio_unitario), 0);
 
     const pendingItemsCount = items.filter(i => ['pendiente', 'en_preparacion'].includes(i.estado)).length;
-    const canPay = pendingItemsCount === 0;
+    const canPay = true; // VENTAS RÁPIDAS: Siempre permitido
 
     if (loading) return <div className="p-8 text-center">Cargando...</div>;
 
@@ -317,23 +317,23 @@ export default function OrderPayment() {
                 {/* Right: Payment Controller */}
                 <div className="xl:col-span-4 space-y-4">
 
-                    {!canPay && (
-                        <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 relative overflow-hidden">
+                    {pendingItemsCount > 0 && (
+                        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 relative overflow-hidden">
                             <div className="flex items-center gap-3">
-                                <div className="p-2 bg-orange-100 rounded-full text-orange-600 shrink-0 animate-pulse">
-                                    <AlertTriangle size={20} />
+                                <div className="p-2 bg-blue-100 rounded-full text-blue-600 shrink-0">
+                                    <ChefHat size={20} />
                                 </div>
                                 <div>
-                                    <h4 className="font-bold text-orange-900 text-sm leading-tight">Orden en Proceso</h4>
-                                    <p className="text-orange-800 text-xs mt-0.5">
-                                        Faltan <strong>{pendingItemsCount} items</strong>.
+                                    <h4 className="font-bold text-blue-900 text-sm leading-tight">Cobro Anticipado</h4>
+                                    <p className="text-blue-800 text-xs mt-0.5">
+                                        Esta orden tiene <strong>{pendingItemsCount} items</strong> en preparación.
                                     </p>
                                 </div>
                             </div>
                         </div>
                     )}
 
-                    <div className={`bg-white rounded-3xl shadow-xl border border-gray-100 p-5 sticky top-4 ${!canPay ? 'opacity-50 pointer-events-none grayscale' : ''}`}>
+                    <div className={`bg-white rounded-3xl shadow-xl border border-gray-100 p-5 sticky top-4`}>
                         <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Método de Pago</h3>
 
                         {/* Horizontal Grid for Payment Methods - Compact */}

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import {
     BarChart3, TrendingUp, Calendar, Users,
-    DollarSign, ShoppingBag, Printer, Mail, X, List
+    DollarSign, ShoppingBag, Printer, Mail, X, List, AlertTriangle
 } from 'lucide-react';
 import { startOfDay, endOfDay, startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
 
@@ -18,7 +18,10 @@ interface ReportMetrics {
     totalRevenue: number;
     totalOrders: number;
     averageTicket: number;
+    totalOpening: number; // New: Opening amount
+    totalCashSales: number; // New: Cash sales only
     topProducts: { name: string; quantity: number; revenue: number }[];
+    lowProducts: { name: string; quantity: number; revenue: number }[];
     allProducts: { name: string; quantity: number; revenue: number }[];
     salesByWaiter: { name: string; total: number; orders: number }[];
     detailedOrders: DetailedOrder[];
@@ -37,7 +40,10 @@ export default function ReportsDashboard() {
         totalRevenue: 0,
         totalOrders: 0,
         averageTicket: 0,
+        totalOpening: 0,
+        totalCashSales: 0,
         topProducts: [],
+        lowProducts: [],
         allProducts: [],
         salesByWaiter: [],
         detailedOrders: []
@@ -66,6 +72,8 @@ export default function ReportsDashboard() {
     };
 
     async function fetchData() {
+
+
         setLoading(true);
         const range = getDateRange();
         if (!range) {
@@ -77,18 +85,33 @@ export default function ReportsDashboard() {
             // 1. Fetch Orders in Range
             const { data: orders, error: ordersError } = await supabase
                 .from('orders')
-                .select('id, total, garzon_id, created_at, numero_mesa')
+                .select('id, total, garzon_id, created_at, numero_mesa, metodo_pago')
                 .eq('estado', 'pagado')
                 .gte('created_at', range.start.toISOString())
                 .lte('created_at', range.end.toISOString())
-                .order('created_at', { ascending: false }); // Order by date desc
+                .order('created_at', { ascending: false });
 
             if (ordersError) throw ordersError;
+
+            // 1b. Fetch Cash Sessions for Opening Amounts
+            const { data: sessions, error: sessionsError } = await supabase
+                .from('cash_sessions')
+                .select('monto_apertura')
+                .gte('opened_at', range.start.toISOString())
+                .lte('opened_at', range.end.toISOString());
+
+            if (sessionsError) throw sessionsError;
 
             // 2. Fetch Order Items in Range (for product stats)
             const orderIds = orders?.map(o => o.id) || [];
 
-            let items: any[] = [];
+            interface ReportItem {
+                quantity: number;
+                price: number;
+                products1: { nombre: string } | null;
+            }
+
+            let items: ReportItem[] = [];
             if (orderIds.length > 0) {
                 const { data: itemsData, error: itemsError } = await supabase
                     .from('order_items')
@@ -96,7 +119,8 @@ export default function ReportsDashboard() {
                     .in('order_id', orderIds);
 
                 if (itemsError) throw itemsError;
-                items = itemsData || [];
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                items = (itemsData as any) || [];
             }
 
             // 3. Fetch Profiles for Waiter Names
@@ -117,9 +141,13 @@ export default function ReportsDashboard() {
             const totalOrders = orders?.length || 0;
             const averageTicket = totalOrders > 0 ? totalRevenue / totalOrders : 0;
 
+            // Cash specific
+            const totalOpening = sessions?.reduce((sum, s) => sum + s.monto_apertura, 0) || 0;
+            const totalCashSales = orders?.filter(o => o.metodo_pago?.toLowerCase() === 'efectivo').reduce((sum, o) => sum + o.total, 0) || 0;
+
             // Top Products
             const productStats: Record<string, { quantity: number; revenue: number }> = {};
-            items.forEach((item: any) => {
+            items.forEach((item) => {
                 const name = item.products1?.nombre || 'Desconocido';
                 if (!productStats[name]) productStats[name] = { quantity: 0, revenue: 0 };
                 productStats[name].quantity += item.quantity;
@@ -131,6 +159,7 @@ export default function ReportsDashboard() {
                 .sort((a, b) => b.quantity - a.quantity);
 
             const topProducts = allProducts.slice(0, 5);
+            const lowProducts = [...allProducts].reverse().slice(0, 5).filter(p => p.quantity > 0);
 
             // Waiter Performance
             const waiterStats: Record<string, { total: number; orders: number }> = {};
@@ -158,7 +187,10 @@ export default function ReportsDashboard() {
                 totalRevenue,
                 totalOrders,
                 averageTicket,
+                totalOpening,
+                totalCashSales,
                 topProducts,
+                lowProducts,
                 allProducts,
                 salesByWaiter,
                 detailedOrders
@@ -170,6 +202,7 @@ export default function ReportsDashboard() {
             setLoading(false);
         }
     }
+
 
     const handlePrint = () => {
         window.print();
@@ -353,6 +386,48 @@ export default function ReportsDashboard() {
                         </div>
                     </div>
 
+                    {/* CASH MANAGEMENT CARDS */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 print:grid-cols-3">
+                        {/* OPENING AMOUNT */}
+                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 relative overflow-hidden group print:border-gray-300 print:shadow-none">
+                            <div className="relative z-10">
+                                <p className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-1">Fondo de Apertura</p>
+                                <h2 className="text-3xl font-black text-gray-900 tracking-tight">
+                                    Bs {metrics.totalOpening.toLocaleString('es-BO', { minimumFractionDigits: 2 })}
+                                </h2>
+                                <p className="text-gray-400 text-sm font-bold mt-2">
+                                    Monto inicial en caja
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* CASH SALES */}
+                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 relative overflow-hidden group print:border-gray-300 print:shadow-none">
+                            <div className="relative z-10">
+                                <p className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-1">Ventas en Efectivo</p>
+                                <h2 className="text-3xl font-black text-gray-900 tracking-tight">
+                                    Bs {metrics.totalCashSales.toLocaleString('es-BO', { minimumFractionDigits: 2 })}
+                                </h2>
+                                <p className="text-green-600 text-sm font-bold mt-2">
+                                    Generado por ventas
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* TOTAL CASH */}
+                        <div className="bg-gray-900 p-6 rounded-2xl shadow-lg border border-gray-900 relative overflow-hidden group text-white print:bg-white print:text-black print:border-gray-300">
+                            <div className="relative z-10">
+                                <p className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-1">Total en Caja</p>
+                                <h2 className="text-3xl font-black text-white tracking-tight print:text-black">
+                                    Bs {(metrics.totalOpening + metrics.totalCashSales).toLocaleString('es-BO', { minimumFractionDigits: 2 })}
+                                </h2>
+                                <p className="text-gray-400 text-sm font-bold mt-2">
+                                    (Apertura + Ventas Efec.)
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
                     {/* CHARTS / TABLES */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 print:grid-cols-2 print:gap-4">
                         {/* TOP PRODUCTS */}
@@ -384,6 +459,46 @@ export default function ReportsDashboard() {
                                                 </td>
                                             </tr>
                                         ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        {/* LOW PRODUCTS */}
+                        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 flex flex-col print:shadow-none print:border-gray-300 print-break">
+                            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-red-50">
+                                <h3 className="font-bold text-lg text-red-800 flex items-center gap-2">
+                                    <AlertTriangle size={20} className="text-red-500" /> Menor Rotación
+                                </h3>
+                            </div>
+                            <div className="p-2">
+                                <table className="w-full text-left">
+                                    <thead className="bg-red-50/50 text-xs text-red-400 uppercase font-bold print:bg-gray-100">
+                                        <tr>
+                                            <th className="px-4 py-3 rounded-l-lg">Producto</th>
+                                            <th className="px-4 py-3 text-right">Cant.</th>
+                                            <th className="px-4 py-3 rounded-r-lg text-right">Ingresos</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-red-50">
+                                        {metrics.lowProducts.map((p, i) => (
+                                            <tr key={i} className="hover:bg-red-50/30 group">
+                                                <td className="px-4 py-3 font-medium text-gray-800">
+                                                    {p.name}
+                                                </td>
+                                                <td className="px-4 py-3 text-right text-gray-600 font-mono">{p.quantity}</td>
+                                                <td className="px-4 py-3 text-right font-bold text-gray-900">
+                                                    Bs {p.revenue.toLocaleString('es-BO')}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                        {metrics.lowProducts.length === 0 && (
+                                            <tr>
+                                                <td colSpan={3} className="px-4 py-6 text-center text-gray-400 text-sm">
+                                                    Datos insuficientes
+                                                </td>
+                                            </tr>
+                                        )}
                                     </tbody>
                                 </table>
                             </div>

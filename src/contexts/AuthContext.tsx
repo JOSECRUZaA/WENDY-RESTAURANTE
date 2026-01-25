@@ -1,0 +1,156 @@
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import type { User, Session } from '@supabase/supabase-js';
+import { supabase } from '../lib/supabase';
+import type { Database } from '../types/database.types';
+
+type Profile = Database['public']['Tables']['profiles']['Row'];
+
+interface AuthContextType {
+    user: User | null;
+    profile: Profile | null;
+    session: Session | null;
+    loading: boolean;
+    error: string | null;
+    signOut: () => Promise<void>;
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+    const [user, setUser] = useState<User | null>(null);
+    const [session, setSession] = useState<Session | null>(null);
+    const [profile, setProfile] = useState<Profile | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+
+    // 1. Fetch Profile Logic
+    async function fetchProfile(userId: string) {
+        try {
+            setError(null);
+
+            // 5s Timeout for DB
+            const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('Timeout al cargar perfil')), 5000)
+            );
+
+            const fetchPromise = supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', userId)
+                .single();
+
+            const { data, error } = await Promise.race([fetchPromise, timeoutPromise]) as any;
+
+            if (error) {
+                console.error('Error fetching profile:', error);
+
+                setProfile((prev) => {
+                    // Try to preserve stale profile if network error
+                    if (prev && prev.id === userId) {
+                        if (error.code === 'PGRST116') {
+                            setError('Perfil no encontrado');
+                            return null;
+                        }
+                        console.warn('Persisting stale profile:', error);
+                        return prev;
+                    }
+
+                    if (error.code !== 'PGRST116') setError(error.message);
+                    return null;
+                });
+            } else {
+                setProfile(data);
+            }
+        } catch (err: any) {
+            console.error('Unexpected auth error:', err);
+
+            setProfile((prev) => {
+                if (prev && prev.id === userId) {
+                    console.warn('Persisting profile despite exception:', err);
+                    return prev;
+                }
+                setError(err.message || 'Error desconocido');
+                return null;
+            });
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    // 2. Auth Effect
+    useEffect(() => {
+        let mounted = true;
+
+        // GLOBAL FAILSAFE: If app remains locked for > 3s, force unlock
+        const failsafeTimer = setTimeout(() => {
+            if (mounted) {
+                setLoading((cur) => {
+                    if (cur) {
+                        console.warn('Authentication took too long, unlocking app...');
+                        return false;
+                    }
+                    return cur;
+                });
+            }
+        }, 3000);
+
+        // Listen for Auth State Changes
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+            if (!mounted) return;
+            console.log('Auth Event:', event);
+
+            setSession(session);
+            setUser(session?.user ?? null);
+
+            if (session?.user) {
+                // If we have a user, try to get their profile
+                await fetchProfile(session.user.id);
+            } else {
+                // Signed out or no user
+                setProfile(null);
+                setLoading(false);
+            }
+        });
+
+        // Initial Session Check (Async)
+        // REMOVED manual getSession() check as it causes race conditions with onAuthStateChange.
+        // We rely purely on the subscription event 'INITIAL_SESSION' to handle startup.
+        /*
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            if (mounted && !session) {
+                // If no session found immediately, stop loading
+                console.log('No initial session found.');
+                setLoading(false);
+            }
+        });
+        */
+
+        return () => {
+            mounted = false;
+            clearTimeout(failsafeTimer);
+            subscription.unsubscribe();
+        };
+    }, []);
+
+    const signOut = async () => {
+        await supabase.auth.signOut();
+        setProfile(null);
+        setUser(null);
+        setSession(null);
+        setError(null);
+    };
+
+    return (
+        <AuthContext.Provider value={{ user, session, profile, loading, error, signOut }}>
+            {children}
+        </AuthContext.Provider>
+    );
+}
+
+export function useAuth() {
+    const context = useContext(AuthContext);
+    if (context === undefined) {
+        throw new Error('useAuth must be used within an AuthProvider');
+    }
+    return context;
+}

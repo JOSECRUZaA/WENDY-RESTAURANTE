@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import type { Database, TableStatus } from '../types/database.types';
-import { Search, ShoppingCart, Trash2, Save, ArrowLeft, FileText, CheckCircle, Lock, ChefHat, Beer, ImageOff, UtensilsCrossed } from 'lucide-react';
+import { Search, ShoppingCart, Trash2, Save, ArrowLeft, FileText, CheckCircle, Lock, ChefHat, Beer, ImageOff, UtensilsCrossed, Star } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 type Product = Database['public']['Tables']['products']['Row'];
@@ -375,8 +375,16 @@ export default function OrderCreation() {
                         <button
                             key={product.id}
                             onClick={() => addToCart(product)}
-                            className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all overflow-hidden flex flex-col group h-auto min-h-[200px] relative w-full"
+                            className={`rounded-2xl border shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all overflow-hidden flex flex-col group h-auto min-h-[200px] relative w-full ${product.prioridad ? 'bg-yellow-50/30 border-yellow-400 ring-4 ring-yellow-50/50 shadow-yellow-100' : 'bg-white border-gray-100'
+                                }`}
                         >
+                            {/* Priority Badge */}
+                            {product.prioridad && (
+                                <div className="absolute top-3 right-3 z-30 bg-yellow-400 text-yellow-900 text-[10px] font-black px-2 py-1 rounded-full shadow-lg flex items-center gap-1 animate-pulse">
+                                    <Star size={10} className="fill-yellow-900" />
+                                    RECOMENDADO
+                                </div>
+                            )}
                             {/* Product Image Area - Robust Layout */}
                             <div className={`w-full h-32 shrink-0 flex items-center justify-center relative overflow-hidden ${product.area === 'cocina' ? 'bg-orange-50' : (product.area === 'bar' ? 'bg-purple-50' : 'bg-gray-50')
                                 }`}>

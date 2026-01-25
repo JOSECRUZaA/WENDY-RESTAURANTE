@@ -20,8 +20,32 @@ import { OnlineUsersProvider } from './contexts/OnlineUsersContext';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
+  const [showTimeout, setShowTimeout] = React.useState(false);
 
-  if (loading) return <div>Cargando...</div>;
+  React.useEffect(() => {
+    const timer = setTimeout(() => setShowTimeout(true), 5000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (loading) return (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-4">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mb-4"></div>
+      <p className="text-gray-600 font-medium">Verificando sesión...</p>
+      {showTimeout && (
+        <div className="mt-4 p-4 bg-yellow-50 text-yellow-800 rounded-lg max-w-md text-center border border-yellow-200 animate-in fade-in">
+          <p className="font-bold mb-2">⚠ Tiempo de espera excedido</p>
+          <p className="text-sm mb-3">No pudimos verificar tu sesión. Intenta recargar.</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700 transition-colors pointer-events-auto"
+          >
+            Recargar Página
+          </button>
+        </div>
+      )}
+    </div>
+  );
+
   if (!user) return <Navigate to="/login" />;
 
   return <>{children}</>;
@@ -29,8 +53,31 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 function RoleBasedRedirect() {
   const { profile, loading } = useAuth();
+  const [showTimeout, setShowTimeout] = React.useState(false);
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center bg-gray-100">Cargando...</div>;
+  React.useEffect(() => {
+    const timer = setTimeout(() => setShowTimeout(true), 5000); // 5s timeout
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (loading) return (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-4">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mb-4"></div>
+      <p className="text-gray-600 font-medium">Cargando sistema...</p>
+      {showTimeout && (
+        <div className="mt-4 p-4 bg-yellow-50 text-yellow-800 rounded-lg max-w-md text-center border border-yellow-200 shadow-sm animate-in fade-in slide-in-from-bottom-2">
+          <p className="font-bold mb-2">⚠ Tiempo de espera excedido</p>
+          <p className="text-sm mb-3">La conexión está tardando más de lo esperado. Verifica tu internet.</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700 transition-colors pointer-events-auto"
+          >
+            Recargar Página
+          </button>
+        </div>
+      )}
+    </div>
+  );
 
   if (!profile) return <Navigate to="/login" />;
 
