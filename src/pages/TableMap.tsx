@@ -150,8 +150,9 @@ export default function TableMap() {
                         key={table.id}
                         onClick={() => handleTableClick(table)}
                         className={`
-                            group relative aspect-square p-6 rounded-2xl border-2 transition-all duration-300
+                            group relative aspect-square p-6 rounded-2xl border-2 transition-all duration-200
                             flex flex-col justify-between items-center shadow-sm hover:shadow-xl hover:-translate-y-1
+                            active:scale-95 active:shadow-inner
                             ${getCardStyles(table.estado)}
                         `}
                     >

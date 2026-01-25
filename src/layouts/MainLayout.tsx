@@ -200,7 +200,7 @@ export default function MainLayout() {
                     </button>
                     <button
                         onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                        className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+                        className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg active:bg-gray-200 active:scale-95 transition-all"
                     >
                         {isMobileMenuOpen ? <LogOut size={24} className="rotate-180" /> : <div className="space-y-1.5">
                             <span className="block w-6 h-0.5 bg-gray-800"></span>
@@ -236,7 +236,7 @@ export default function MainLayout() {
                     {/* Close Button Mobile Only */}
                     <button
                         onClick={() => setIsMobileMenuOpen(false)}
-                        className="md:hidden p-2 text-gray-400 hover:text-gray-600"
+                        className="md:hidden p-2 text-gray-400 hover:text-gray-600 active:bg-gray-100 rounded-full"
                     >
                         <LogOut size={20} className="rotate-180" /> {/* Reusing Icon for Close */}
                     </button>
@@ -319,9 +319,9 @@ function NavLink({ to, icon, label, active }: { to: string; icon: React.ReactNod
     return (
         <Link
             to={to}
-            className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${active
-                ? 'bg-red-50 text-red-600 font-medium'
-                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+            className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 ${active
+                ? 'bg-red-50 text-red-600 font-medium shadow-sm'
+                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 active:bg-gray-100 active:scale-95'
                 }`}
         >
             {icon}

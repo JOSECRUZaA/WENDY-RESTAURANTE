@@ -310,7 +310,7 @@ export default function OrderCreation() {
                 {/* Header */}
                 <div className="flex justify-between items-center flex-wrap gap-2">
                     <div className="flex items-center gap-2">
-                        <button onClick={() => navigate('/mesas')} className="p-2 hover:bg-gray-100 rounded-lg">
+                        <button onClick={() => navigate('/mesas')} className="p-2 hover:bg-gray-100 rounded-lg active:bg-gray-200 active:scale-95 transition-all">
                             <ArrowLeft />
                         </button>
                         <div>
@@ -326,7 +326,7 @@ export default function OrderCreation() {
                     <div className="flex gap-2 overflow-x-auto pb-1 max-w-full no-scrollbar">
                         <button
                             onClick={() => setCategory('all')}
-                            className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-bold transition-all ${category === 'all'
+                            className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-bold transition-all active:scale-95 ${category === 'all'
                                 ? 'bg-gray-900 text-white shadow-lg shadow-gray-200'
                                 : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
                                 }`}
@@ -336,7 +336,7 @@ export default function OrderCreation() {
                         </button>
                         <button
                             onClick={() => setCategory('cocina')}
-                            className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-bold transition-all ${category === 'cocina'
+                            className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-bold transition-all active:scale-95 ${category === 'cocina'
                                 ? 'bg-orange-500 text-white shadow-lg shadow-orange-200'
                                 : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
                                 }`}
@@ -346,7 +346,7 @@ export default function OrderCreation() {
                         </button>
                         <button
                             onClick={() => setCategory('bar')}
-                            className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-bold transition-all ${category === 'bar'
+                            className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-bold transition-all active:scale-95 ${category === 'bar'
                                 ? 'bg-purple-600 text-white shadow-lg shadow-purple-200'
                                 : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
                                 }`}
@@ -375,7 +375,7 @@ export default function OrderCreation() {
                         <button
                             key={product.id}
                             onClick={() => addToCart(product)}
-                            className={`rounded-2xl border shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all overflow-hidden flex flex-col group h-auto min-h-[200px] relative w-full ${product.prioridad ? 'bg-yellow-50/30 border-yellow-400 ring-4 ring-yellow-50/50 shadow-yellow-100' : 'bg-white border-gray-100'
+                            className={`rounded-2xl border shadow-sm hover:shadow-xl hover:-translate-y-1 active:scale-95 active:shadow-inner transition-all overflow-hidden flex flex-col group h-auto min-h-[200px] relative w-full ${product.prioridad ? 'bg-yellow-50/30 border-yellow-400 ring-4 ring-yellow-50/50 shadow-yellow-100' : 'bg-white border-gray-100'
                                 }`}
                         >
                             {/* Priority Badge */}
@@ -587,7 +587,7 @@ export default function OrderCreation() {
                             <button
                                 onClick={submitOrder}
                                 disabled={cart.length === 0 || loading}
-                                className="w-full bg-red-600 text-white py-3 rounded-xl font-bold hover:bg-red-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                                className="w-full bg-red-600 text-white py-3 rounded-xl font-bold hover:bg-red-700 active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2 transition-transform"
                             >
                                 {loading ? 'Enviando...' : (
                                     <>
