@@ -11,7 +11,8 @@ import {
     CircleDollarSign,
     ClipboardList,
     Beer,
-    LayoutGrid
+    LayoutGrid,
+    Bell
 } from 'lucide-react';
 
 import { supabase } from '../lib/supabase';
@@ -174,16 +175,24 @@ export default function MainLayout() {
                     </div>
                     <span className="font-bold text-gray-800">Wendy's App</span>
                 </div>
-                <button
-                    onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                    className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg"
-                >
-                    {isMobileMenuOpen ? <LogOut size={24} className="rotate-180" /> : <div className="space-y-1.5">
-                        <span className="block w-6 h-0.5 bg-gray-800"></span>
-                        <span className="block w-6 h-0.5 bg-gray-800"></span>
-                        <span className="block w-6 h-0.5 bg-gray-800"></span>
-                    </div>}
-                </button>
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={() => { playNotification(); showToast('🔔 Prueba de Sonido OK', 'info'); }}
+                        className="p-2 text-blue-600 bg-blue-50 rounded-full active:scale-90 transition-transform"
+                    >
+                        <Bell size={20} />
+                    </button>
+                    <button
+                        onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                        className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+                    >
+                        {isMobileMenuOpen ? <LogOut size={24} className="rotate-180" /> : <div className="space-y-1.5">
+                            <span className="block w-6 h-0.5 bg-gray-800"></span>
+                            <span className="block w-6 h-0.5 bg-gray-800"></span>
+                            <span className="block w-6 h-0.5 bg-gray-800"></span>
+                        </div>}
+                    </button>
+                </div>
             </header>
 
             {/* Sidebar (Desktop: Static, Mobile: Fixed Overlay) */}
