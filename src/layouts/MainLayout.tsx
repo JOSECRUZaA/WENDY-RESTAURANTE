@@ -201,7 +201,7 @@ export default function MainLayout() {
             <Toast message={toast.message} type={toast.type} isVisible={toast.isVisible} onClose={hideToast} />
 
             {/* Mobile Header */}
-            <header className="bg-white border-b p-4 flex justify-between items-center md:hidden z-20">
+            <header className="bg-white border-b p-4 flex justify-between items-center md:hidden sticky top-0 z-40 shadow-sm safe-area-top">
                 <div className="flex items-center gap-2">
                     <div className="w-8 h-8 rounded-full bg-red-600 flex items-center justify-center text-white font-bold">
                         W
@@ -233,7 +233,7 @@ export default function MainLayout() {
 
             {/* Sidebar (Desktop: Static, Mobile: Fixed Overlay) */}
             <aside className={`
-                fixed inset-y-0 left-0 z-30 w-64 bg-white shadow-xl transform transition-transform duration-300 ease-in-out flex flex-col
+                fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-xl transform transition-transform duration-300 ease-in-out flex flex-col
                 md:relative md:translate-x-0 md:bg-white md:shadow-md
                 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
             `}>
@@ -322,7 +322,7 @@ export default function MainLayout() {
             {/* Overlay Background for Mobile */}
             {isMobileMenuOpen && (
                 <div
-                    className="fixed inset-0 bg-black/50 z-20 md:hidden"
+                    className="fixed inset-0 bg-black/50 z-30 md:hidden backdrop-blur-sm animate-in fade-in"
                     onClick={() => setIsMobileMenuOpen(false)}
                 />
             )}
